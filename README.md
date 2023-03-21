@@ -27,8 +27,8 @@
 ``` r
 library(magick)
 
-i <- image_read('original.png')
-i
+original <- image_read('original.png')
+original
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-2-1.png" width="256" />
@@ -46,14 +46,14 @@ i
         *to replicate that CRT scanline horizontal smudge feel*
 
 ``` r
-w <- image_info(i)$width
-h <- image_info(i)$height
+w <- image_info(original)$width
+h <- image_info(original)$height
 
-i_scaled <-
-    image_resize(i, geometry = paste0(w, 'x', h*4, '!'), filter = "point") |> 
+original_scaled <-
+    image_resize(original, geometry = paste0(w, 'x', h*4, '!'), filter = "point") |> 
     image_resize(geometry = paste0(w*4, 'x', h*4, '!'), filter = "triangle")
 
-i_scaled
+original_scaled
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-3-1.png" width="1024" />
@@ -83,17 +83,135 @@ sl_filter <-
 -   Then layer the scanline pattern using the `SoftLight` operator
 
 ``` r
-out <- image_composite(i_scaled, sl_filter, operator = "SoftLight")
+out <- image_composite(original_scaled, sl_filter, operator = "SoftLight")
 out
 ```
 
 <img src="README_files/figure-gfm/unnamed-chunk-5-1.png" width="1024" />
 
-## Save outputs
-
--   Save the output at full resolution for inspection
+## Inspect output
 
 ``` r
-image_write(i_scaled, 'original_scaled.png')
+library(tidyverse)
+x_zoom <- c(700, 800)
+y_zoom <- c(200, 300)
+
+# Scale the original 4x using point in both x and y
+# This is to get the original to match the two outputs in pixel dimensions
+original |> 
+    image_resize("400%", filter = "point") |> 
+    image_flip() |> 
+    image_raster() |> 
+    mutate(type = '1. Original (scaled 4x)') |> 
+    filter(
+        between(x, x_zoom[1], x_zoom[2]),
+        between(y, y_zoom[1], y_zoom[2])) |> 
+    # Bind rows to original with separate scaling in y and x
+    bind_rows(
+        original_scaled |> 
+            image_flip() |> 
+            image_raster() |>
+            mutate(type = "2. Horizontal 'smudge scaled' \n (Vertical: Nearest Neighbour) \n (Horizontal: Bilinear)") |> 
+            filter(
+                between(x, x_zoom[1], x_zoom[2]),
+                between(y, y_zoom[1], y_zoom[2]))) |> 
+    # Bind rows to original with separate scaling in y and x and scanline filter applied
+    bind_rows(
+        out |> 
+            image_flip() |> 
+            image_raster() |>
+            mutate(type = '3. Scanline filter (4 pixel height) applied') |> 
+            filter(
+                between(x, x_zoom[1], x_zoom[2]),
+                between(y, y_zoom[1], y_zoom[2])))|> 
+    ggplot() + 
+    geom_raster(aes(x, y, fill=I(col)))+
+    coord_equal() +
+    facet_wrap(~type)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+## Save outputs
+
+-   Save the output at full resolution
+
+``` r
+image_write(original_scaled, 'original_scaled.png')
 image_write(out, 'original_scanlined.png')
+```
+
+## Extending to 6 pixel height symmetric scanline filter
+
+-   With even more horizontal smudge by using a `cubic` filter
+
+``` r
+original_scaled_6x <-
+    image_resize(original, geometry = paste0(w, 'x', h*6, '!'), filter = "point") |> 
+    image_resize(geometry = paste0(w*6, 'x', h*6, '!'), filter = "cubic")
+
+x <- c(
+    rgb(000, 000, 000, 255, maxColorValue = 255), # opaque black
+    rgb(000, 000, 000, 128, maxColorValue = 255), # 50% transparent black
+    rgb(255, 255, 255, 000, maxColorValue = 255), # 100% transparent white
+    rgb(255, 255, 255, 000, maxColorValue = 255), # 100% transparent white
+    rgb(000, 000, 000, 128, maxColorValue = 255), # 50% transparent black
+    rgb(000, 000, 000, 255, maxColorValue = 255)  # opaque black
+    )
+
+sl_filter_6x <-
+    rep(x, length.out = h*6) |> 
+    rep(each = w*6) |> 
+    matrix(ncol = w*6, nrow = h*6, byrow = TRUE) |> 
+    image_read()
+
+out_6x <- image_composite(original_scaled_6x, sl_filter_6x, operator = "SoftLight")
+
+
+
+
+# Recompute the zoom coords for the 6x scaled image
+x_zoom <- x_zoom*1.5
+y_zoom <- y_zoom*1.5
+
+# Scale the original 6x using point in both x and y
+# This is to get the original to match the two outputs in pixel dimensions
+original |> 
+    image_resize("600%", filter = "point") |> 
+    image_flip() |> 
+    image_raster() |> 
+    mutate(type = '1. Original (scaled 6x)') |> 
+    filter(
+        between(x, x_zoom[1], x_zoom[2]),
+        between(y, y_zoom[1], y_zoom[2])) |> 
+    # Bind rows to original with separate scaling in y and x
+    bind_rows(
+        original_scaled_6x |> 
+            image_flip() |> 
+            image_raster() |>
+            mutate(type = "2. Horizontal 'smudge scaled' \n (Vertical: Nearest Neighbour) \n (Horizontal: Cubic)") |> 
+            filter(
+                between(x, x_zoom[1], x_zoom[2]),
+                between(y, y_zoom[1], y_zoom[2]))) |> 
+    # Bind rows to original with separate scaling in y and x and scanline filter applied
+    bind_rows(
+        out_6x |> 
+            image_flip() |> 
+            image_raster() |>
+            mutate(type = '3. Scanline filter (6 pixel height) applied') |> 
+            filter(
+                between(x, x_zoom[1], x_zoom[2]),
+                between(y, y_zoom[1], y_zoom[2])))|> 
+    ggplot() + 
+    geom_raster(aes(x, y, fill=I(col)))+
+    coord_equal() +
+    facet_wrap(~type)
+```
+
+![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+``` r
+
+image_write(original_scaled_6x, 'original_scaled_6x.png')
+image_write(out_6x, 'original_scanlined_6x.png')
 ```
