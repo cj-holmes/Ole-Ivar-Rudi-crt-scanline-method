@@ -123,7 +123,7 @@ image_write(out, 'original_scanlined.png')
 
 ## Extending to 6 pixel height symmetric scanline filter
 * With even more horizontal smudge by using a `cubic` filter
-```{r fig.width = 9, fig.height = 4, dpi=600}
+```{r}
 original_scaled_6x <-
     image_resize(original, geometry = paste0(w, 'x', h*6, '!'), filter = "point") |> 
     image_resize(geometry = paste0(w*6, 'x', h*6, '!'), filter = "cubic")
@@ -144,10 +144,11 @@ sl_filter_6x <-
     image_read()
 
 out_6x <- image_composite(original_scaled_6x, sl_filter_6x, operator = "SoftLight")
+out_6x
+```
 
-
-
-
+* Inspect output
+```{r fig.width = 9, fig.height = 4, dpi=600}
 # Recompute the zoom coords for the 6x scaled image
 x_zoom <- x_zoom*1.5
 y_zoom <- y_zoom*1.5
@@ -184,7 +185,10 @@ original |>
     geom_raster(aes(x, y, fill=I(col)))+
     coord_equal() +
     facet_wrap(~type)
+```
 
+* Save the 6x outputs at full resolution
+```{r}
 image_write(original_scaled_6x, 'original_scaled_6x.png')
 image_write(out_6x, 'original_scanlined_6x.png')
 ```

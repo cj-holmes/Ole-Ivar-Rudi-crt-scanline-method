@@ -166,10 +166,14 @@ sl_filter_6x <-
     image_read()
 
 out_6x <- image_composite(original_scaled_6x, sl_filter_6x, operator = "SoftLight")
+out_6x
+```
 
+<img src="README_files/figure-gfm/unnamed-chunk-8-1.png" width="1536" />
 
+-   Inspect output
 
-
+``` r
 # Recompute the zoom coords for the 6x scaled image
 x_zoom <- x_zoom*1.5
 y_zoom <- y_zoom*1.5
@@ -208,10 +212,11 @@ original |>
     facet_wrap(~type)
 ```
 
-![](README_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](README_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+-   Save the 6x outputs at full resolution
 
 ``` r
-
 image_write(original_scaled_6x, 'original_scaled_6x.png')
 image_write(out_6x, 'original_scanlined_6x.png')
 ```
